@@ -82,10 +82,29 @@ function getBLPrices(pn, cid) {
 
 
                             if (newPriceLISTEDAvg.length > 12 || newPriceSOLDAvg.length > 12) {
-                                console.log(pn, " has a price issue");
-                                console.log("new: ", newPriceSOLDAvg);
-                                console.log("used: ", newPriceLISTEDAvg);
+
+
+                                console.log({
+                                    soldQty: newSoldQty,
+                                    soldPriceMin: newPriceSOLDMin,
+                                    soldPriceAvg: newPriceSOLDAvg,
+                                    listedQty: newListedQty,
+                                    listedPriceMin: newPriceLISTEDMin,
+                                    listedPriceAvg: newPriceLISTEDAvg
+                                });
                                 console.log('P3: FAILED');
+
+
+                                if (newPriceSOLDMin.includes('Add to My Inventory') || newPriceSOLDAvg.includes('Add to My Inventory')) {
+                                    resolve({
+                                        soldQty: newSoldQty,
+                                        soldPriceMin: "unavailable",
+                                        soldPriceAvg: "unavailable",
+                                        listedQty: newListedQty,
+                                        listedPriceMin: newPriceLISTEDMin,
+                                        listedPriceAvg: newPriceLISTEDAvg
+                                    })
+                                }
                                 resolve(null)
                             } else {
                                 // console.log("new: ", newPriceSOLDAvg);
@@ -106,17 +125,17 @@ function getBLPrices(pn, cid) {
                     } else if (resp.statusCode == 403) {
                         console.log("403");
                         // hasError = true
-                        resolve(null)
+                        reject("Error: 403");
 
                     } else {
 
                         console.log(resp.statusCode + " is a weird code.");
-                        resolve(null)
+                        reject(`Error: ${resp.statusCode}`);
                     }
                 })
                 .on("error", (err) => {
                     hasError = true
-                    resolve(null)
+
                     console.log(err);
                     reject("Error: " + err.message);
                 })

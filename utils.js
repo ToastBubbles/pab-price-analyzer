@@ -36,7 +36,17 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function parseMoneyString(moneyString) {
+    // Remove the '$' sign from the string
+    const stringWithoutDollarSign = moneyString.replace('$', '');
+
+    // Parse the string to a float
+    const floatValue = parseFloat(stringWithoutDollarSign);
+
+    return floatValue;
+}
 
 exports.extractColorIdFromUrl = extractColorIdFromUrl
 exports.delay = delay
 exports.generateHeader = generateHeader
+exports.parseMoneyString = parseMoneyString

@@ -6,53 +6,30 @@ const { getBLPrices } = require('./bl-checker-3');
 const fs = require("fs");
 
 let saveData = []
-let pages = 0
+let pages = 33
 
+const delayMS = 26500
 
+let pabCache = []
 
-// async function start() {
-
-
-//     let currentPage = 1;
-
-//     async function processPage(page) {
-//         let items = await getPaB(page);
-//         console.log(items);
-
-//         let filteredItems = items.filter(item => {
-//             return !saveData.some(entry => entry.id === item.id);
-//         });
-
-//         if (filteredItems.length !== items.length) {
-//             console.log(`${items.length - filteredItems.length} entries found, continuing where left off...`);
-//         }
-
-//         await Promise.all(filteredItems.map(async (item) => {
-//             const checkedItem = await checkPart(item);
-//             if (checkedItem) {
-//                 saveData.push(checkedItem); // Add checked item to saveData
-//                 await save(); // Save to .json file
-//             }
-//             await delay(10000); // Wait for 10 seconds before processing the next item
-//         }));
-
-//         if (currentPage == 1 || currentPage < pages) { // Check if currentPage == 1 or currentPage < pages
-//             currentPage++;
-//             if (currentPage <= pages) {
-//                 await processPage(currentPage); // Process next page recursively
-//             }
-//         }
-//     }
-
-//     await processPage(currentPage);
-// }
 
 async function start() {
-    let currentPage = 1;
+    let currentPage = Math.ceil((saveData.length + 1) / 400);
+    let currentCount = 0
+
+    let pageChange = false
 
     async function processPage(page) {
-        let items = await getPaB(page);
-        console.log(items);
+
+        console.log(`${saveData.length}  / 13051 items scanned. (${(saveData.length / 13051 * 100).toFixed(2)}%)`);
+        console.log(`page ${currentPage}`);
+
+        let items = pabCache.length == 0 || saveData.length / 400 > currentPage ? await getPaB(page) : pabCache
+
+        if (pageChange) {
+            items = await getPaB(page)
+            pageChange = false
+        }
 
         let filteredItems = items.filter(item => {
             return !saveData.some(entry => entry.id === item.id);
@@ -63,19 +40,30 @@ async function start() {
         }
 
         for (let item of filteredItems) {
+            const randInt = Math.floor(Math.random() * 1201);
             const checkedItem = await checkPart(item);
-            console.log(checkedItem);
+
             if (checkedItem) {
-                saveData.push(checkedItem); // Add checked item to saveData
-                await save(); // Save to .json file
+                if (checkedItem.blData !== null) {
+                    saveData.push(checkedItem); // Add checked item to saveData
+                    await save(); // Save to .json file
+                } else {
+                    console.log(`${typeof checkedItem.blData} BL DATA, Stopping...`);
+                    return
+                }
             }
-            console.log('Waiting...');
-            await delay(10000); // Wait for 10 seconds before processing the next item
+            console.log(`Waiting ${(delayMS + randInt) / 1000} seconds...`);
+            currentCount++
+            console.log(`${currentCount} complete`);
+            await delay(delayMS + randInt); // Wait for 10 seconds before processing the next item
         }
 
         if (currentPage == 1 || currentPage < pages) { // Check if currentPage == 1 or currentPage < pages
+
             currentPage++;
+            console.log(`Increasing page to ${currentPage}`);
             if (currentPage <= pages) {
+                pageChange = true
                 await processPage(currentPage); // Process next page recursively
             }
         }
@@ -138,6 +126,13 @@ async function getPaB(page) {
                 }
 
                 console.log("P0: Complete");
+
+                console.log(`${total} total PaB parts`);
+
+                pabCache = convertedResults
+
+                savePaBCache()
+
                 resolve(
                     convertedResults,
                 )
@@ -152,47 +147,90 @@ async function getPaB(page) {
 }
 
 
+// async function checkPart(part) {
+//     let colorId = null
+//     getBLURL(part.elementId)
+//         .then(url => {
+//             if (url) {
+//                 colorId = extractColorIdFromUrl(url);
+
+//                 if (colorId) {
+//                     return getBLPN(url); // Return the promise from getBLPN
+//                 } else {
+//                     console.log("Color ID not found in URL");
+//                     return null; // Return null if color ID not found
+//                 }
+//             } else {
+//                 console.log("URL not found");
+//                 return null;
+//             }
+//         })
+//         .then(pn => {
+//             if (pn && colorId) {
+//                 // console.log("pn & colID: ", pn, colorId);
+//                 return getBLPrices(pn, colorId)
+//             } else {
+//                 console.log("PN not found");
+//                 return null;
+//             }
+//         }).then(data => {
+//             let output = part
+
+//             output.blData = data
+
+//             console.log('final item: ', output);
+
+//             return output;
+
+//         })
+//         .catch(error => {
+//             console.log("Error:", error);
+//             return null;
+//         });
+//     return null;
+// }
 async function checkPart(part) {
-    let colorId = null
-    getBLURL(part.elementId)
-        .then(url => {
-            if (url) {
-                colorId = extractColorIdFromUrl(url);
-
-                if (colorId) {
-                    return getBLPN(url); // Return the promise from getBLPN
+    return new Promise((resolve, reject) => {
+        let colorId = null;
+        getBLURL(part.elementId)
+            .then(url => {
+                if (url) {
+                    colorId = extractColorIdFromUrl(url);
+                    if (colorId) {
+                        return getBLPN(url); // Return the promise from getBLPN
+                    } else {
+                        console.log("Color ID not found in URL");
+                        resolve(null); // Resolve with null if color ID not found
+                    }
                 } else {
-                    console.log("Color ID not found in URL");
-                    return null; // Return null if color ID not found
+                    console.log("URL not found");
+                    resolve(null);
                 }
-            } else {
-                console.log("URL not found");
-                return null;
-            }
-        })
-        .then(pn => {
-            if (pn && colorId) {
-                // console.log("pn & colID: ", pn, colorId);
-                return getBLPrices(pn, colorId)
-            } else {
-                console.log("PN not found");
-                return null;
-            }
-        }).then(data => {
-            let output = part
+            })
+            .then(pn => {
+                if (pn && colorId) {
 
-            output.blData = data
+                    part.colorId = colorId
+                    return getBLPrices(pn, colorId);
+                } else {
+                    console.log("PN | CID not found");
+                    return 'n'
+                }
+            })
+            .then(data => {
+                let output = part;
 
-            console.log('final item: ', output);
-
-            return output;
-
-        })
-        .catch(error => {
-            console.log("Error:", error);
-            return null;
-        });
-    return null;
+                if (data == null) reject()
+                else if (data == 'n') output.blData = 'not on BL'
+                else output.blData = data;
+                console.log('final item: ', output);
+                resolve(output);
+            })
+            .catch(error => {
+                console.log("Error:", error);
+                reject(error);
+            });
+    });
 }
 
 function checkForSave() {
@@ -242,4 +280,37 @@ async function save() {
 
 }
 
-load()
+
+
+function loadPaBCache() {
+    try {
+        console.log('Loading Cache...');
+        let rawdata = fs.readFileSync("cache.json");
+        let localInfo = JSON.parse(rawdata);
+        if (localInfo) {
+            pabCache = localInfo;
+            console.log('File loaded');
+        } else {
+            console.log('Nothing to load');
+        }
+    } catch (e) {
+        console.log(e);
+    } finally {
+        load()
+    }
+}
+
+async function savePaBCache() {
+    try {
+        console.log("Saving Cache...");
+        let data = JSON.stringify(pabCache);
+        await fs.writeFileSync("cache.json", data);
+        console.log("Saved!");
+        return true
+    } catch (e) {
+        console.log(e);
+    }
+
+}
+
+loadPaBCache()
